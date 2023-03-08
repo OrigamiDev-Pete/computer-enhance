@@ -8,9 +8,8 @@ import "core:strings"
 
 import "instructions"
 
-TEST_FILE :: "listing_0038_many_register_mov"
+TEST_FILE :: "listing_0037_single_register_mov"
 TEST_DIR :: "../cmuratori_computer_enhance/perfaware/part1/";
-OUTPUT_DIR :: "./test/"
 
 main :: proc() {
 
@@ -23,9 +22,7 @@ main :: proc() {
         os.exit(1)
     }
 
-    os.make_directory("./test")
-    output_file, err := os.open(OUTPUT_DIR + "test_" + TEST_FILE, os.O_CREATE | os.O_WRONLY)
-    os.write_string(output_file, "bits 16\n\n")
+    fmt.println("bits 16\n")
 
     using instructions
 
@@ -34,9 +31,9 @@ main :: proc() {
     for i := 0; i < len(data); i += 1 {
 
         b := data[i]
-        if is_mov(b) { // MOV
-            strings.builder_init(&instruction_string_builder, context.temp_allocator)
-            strings.write_string(&instruction_string_builder, "mov ")
+        switch {
+        case is_mov(b): // MOV
+            fmt.print("mov ")
 
             d := bit_extract(b, 1)
             w := bit_extract(b, 0)
@@ -44,32 +41,23 @@ main :: proc() {
             i += 1 
             b = data[i]
             // mod reg r/m
-            mod_bits := bits.bitfield_extract(b, 6, 2)
-            reg_bits := bits.bitfield_extract(b, 3, 3)
-            rm_bits := bits.bitfield_extract(b, 0, 3)
+            mod_field := bits.bitfield_extract(b, 6, 2)
+            reg_field := bits.bitfield_extract(b, 3, 3)
+            rm_field := bits.bitfield_extract(b, 0, 3)
+
+            reg : string
+            rm : string
             if w == 0 {
-                reg := MOV_REG_TABLE[reg_bits]
-                rm := MOV_REG_TABLE[rm_bits]
-
-                strings.write_string(&instruction_string_builder, rm)
-                strings.write_string(&instruction_string_builder, ", ")
-                strings.write_string(&instruction_string_builder, reg)
+                reg = MOV_REG_TABLE[reg_field]
+                rm = MOV_REG_TABLE[rm_field]
             } else { // wide
-                reg := MOV_REG_TABLE_W[reg_bits]
-                rm := MOV_REG_TABLE_W[rm_bits]
-
-                strings.write_string(&instruction_string_builder, rm)
-                strings.write_string(&instruction_string_builder, ", ")
-                strings.write_string(&instruction_string_builder, reg)
+                reg = MOV_REG_TABLE_W[reg_field]
+                rm = MOV_REG_TABLE_W[rm_field]
             }
-
-            strings.write_byte(&instruction_string_builder, '\n')
-
-            os.write_string(output_file, strings.to_string(instruction_string_builder))
+            fmt.printf("%v, %v\n", rm, reg)
         }
     }
 
-    os.close(output_file)
     strings.builder_destroy(&instruction_string_builder)
 }
 
