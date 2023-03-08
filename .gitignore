@@ -1,3 +1,5 @@
 ols.json
+*.exe
 
 /.vscode
+**/test
