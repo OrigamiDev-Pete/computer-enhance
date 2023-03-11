@@ -67,38 +67,7 @@ simulate :: proc() {
 
             reg := MOV_REG_TABLE[reg_field] if w == 0 else MOV_REG_TABLE_W[reg_field]
 
-            rm: string
-
-            switch mod_field {
-                case 0b00: // Effective Address
-                    sb := strings.builder_make(context.temp_allocator)
-                    
-                    if (rm_field == 0b110) { // Direct Addressing
-                        disp := extract_data(true)
-                        rm = fmt.sbprintf(&sb, "[%v]", disp)
-                    } else {
-                        rm = fmt.sbprintf(&sb, "[%v]", MOV_EFFECTIVE_ADDRESS_TABLE[rm_field])
-                    }
-
-                case 0b01: // Effective Address + D8
-                    disp := extract_data(false)
-
-                    sb := strings.builder_make(context.temp_allocator)
-
-                    rm = fmt.sbprintf(&sb, "[%v + %v]", MOV_EFFECTIVE_ADDRESS_TABLE[rm_field], disp)
-
-
-                case 0b10: // Effective Address + D16
-                    disp := extract_data(true)
-
-                    sb := strings.builder_make(context.temp_allocator)
-                    rm = fmt.sbprintf(&sb, "[%v + %v]", MOV_EFFECTIVE_ADDRESS_TABLE[rm_field], disp)
-
-                case 0b11: // Register to Register
-                    rm := MOV_REG_TABLE[rm_field] if w == 0 else MOV_REG_TABLE_W[rm_field]
-                    fmt.printf("%v, %v\n", rm, reg)
-                    continue; // continue early to skip the final print.
-            }
+            rm := parse_mod(mod_field, rm_field)
 
             if d == 0 {
                 fmt.printf("%v, %v\n", rm, reg)
@@ -115,33 +84,8 @@ simulate :: proc() {
             mod_field := bits.bitfield_extract(b, 6, 2)
             rm_field := bits.bitfield_extract(b, 0, 3)
 
-            rm: string
+            rm := parse_mod(mod_field, rm_field)
 
-            switch mod_field {
-                case 0b00: // Effective Address
-                    sb := strings.builder_make(context.temp_allocator)
-                    
-                    if (rm_field == 0b110) { // Direct Addressing
-                        disp := extract_data(true)
-                        rm = fmt.sbprintf(&sb, "[%v]", disp)
-                    } else {
-                        rm = fmt.sbprintf(&sb, "[%v]", MOV_EFFECTIVE_ADDRESS_TABLE[rm_field])
-                    }
-
-                case 0b01: // Effective Address + D8
-                    disp := extract_data(false)
-
-                    sb := strings.builder_make(context.temp_allocator)
-                    rm = fmt.sbprintf(&sb, "[%v + %v]", MOV_EFFECTIVE_ADDRESS_TABLE[rm_field], disp)
-
-
-                case 0b10: // Effective Address + D16
-                    disp := extract_data(true)
-
-                    sb := strings.builder_make(context.temp_allocator)
-                    rm = fmt.sbprintf(&sb, "[%v + %v]", MOV_EFFECTIVE_ADDRESS_TABLE[rm_field], disp)
-            }
-            
             data := extract_data(w == 1)
             buf : [8]u8
             data_string := strconv.itoa(buf[:], int(data))
@@ -205,4 +149,34 @@ extract_data :: proc(wide: bool) -> (data: u16) {
         data = bits.bitfield_insert(data, u16(b), 0, 8)
     }
     return
+}
+
+parse_mod :: proc(mod_field, rm_field: u8) -> string {
+    using instructions
+    rm: string
+    switch mod_field {
+        case 0b00: // Effective Address
+            sb := strings.builder_make(context.temp_allocator)
+            
+            if (rm_field == 0b110) { // Direct Addressing
+                disp := extract_data(true)
+                rm = fmt.sbprintf(&sb, "[%v]", disp)
+            } else {
+                rm = fmt.sbprintf(&sb, "[%v]", MOV_EFFECTIVE_ADDRESS_TABLE[rm_field])
+            }
+
+        case 0b01: // Effective Address + D8
+            disp := extract_data(false)
+
+            sb := strings.builder_make(context.temp_allocator)
+            rm = fmt.sbprintf(&sb, "[%v + %v]", MOV_EFFECTIVE_ADDRESS_TABLE[rm_field], disp)
+
+
+        case 0b10: // Effective Address + D16
+            disp := extract_data(true)
+
+            sb := strings.builder_make(context.temp_allocator)
+            rm = fmt.sbprintf(&sb, "[%v + %v]", MOV_EFFECTIVE_ADDRESS_TABLE[rm_field], disp)
+    }
+    return rm
 }
