@@ -23,6 +23,17 @@ instruction_mask_table := []u8 {
 MOV_REG_TABLE   := []string{ "al", "cl", "dl", "bl", "ah", "ch", "dh", "bh" }
 MOV_REG_TABLE_W := []string{ "ax", "cx", "dx", "bx", "sp", "bp", "si", "di" }
 
+MOV_EFFECTIVE_ADDRESS_TABLE := []string{
+    "bx + si",
+    "bx + di",
+    "bp + si",
+    "bp + di",
+    "si",
+    "di",
+    "bp",
+    "bx",
+}
+
 is_instruction :: proc(b: byte, instruction: Instruction) -> bool {
     return b & instruction_mask_table[instruction] == instruction_table[instruction]
 }
