@@ -170,8 +170,14 @@ simulate :: proc() {
 
             fmt.printf("%v, %v\n", reg, data)
         
-        case is_instruction(b, .Mov_Memory_To_Accumulator):
-            fmt.println("Memory to Accumulator")
+        case is_instruction(b, .Mov_Memory_To_Accumulator), is_instruction(b, .Mov_Accumulator_To_Memory):
+            w := bit_extract(b, 0)
+            address := extract_data(w == 1)
+            if (is_instruction(b, .Mov_Memory_To_Accumulator)) {
+                fmt.printf("ax, [%v]\n", address)
+            } else {
+                fmt.printf("[%v], ax\n", address)
+            }
 
         case:
             fmt.println("Unknown instruction")

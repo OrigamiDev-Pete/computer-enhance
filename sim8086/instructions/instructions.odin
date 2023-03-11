@@ -5,19 +5,24 @@ Instruction :: enum u8 {
     Mov_Register_Or_Memory_To_Or_From_Register,
     Mov_Immediate_To_Register_Or_Memory,
     Mov_Immediate_To_Register,
+    Mov_Memory_To_Accumulator,
+    Mov_Accumulator_To_Memory,
 }
 
 instruction_table := []u8 {
     0b10001000, // Mov_Register_Or_Memory_To_Or_From_Register,
     0b11000110, // Mov_Immediate_To_Register_Or_Memory
     0b10110000, // Mov_Immediate_To_Register
+    0b10100000, // Mov_Memory_To_Accumulator
+    0b10100010, // Mov_Accumulator_To_Memory
 }
 
 instruction_mask_table := []u8 {
     0b11111100, // Mov_Register_Or_Memory_To_Or_From_Register,
     0b11111110, // Mov_Immediate_To_Register_Or_Memory
     0b11110000, // Mov_Immediate_To_Register
-
+    0b11111110, // Mov_Memory_To_Accumulator
+    0b11111110, // Mov_Accumulator_To_Memory
 }
 
 MOV_REG_TABLE   := []string{ "al", "cl", "dl", "bl", "ah", "ch", "dh", "bh" }
