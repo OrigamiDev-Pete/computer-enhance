@@ -10,7 +10,7 @@ import "core:strings"
 
 import "instructions"
 
-TEST_FILE :: "listing_0039_more_movs"
+TEST_FILE :: "listing_0040_challenge_movs"
 TEST_DIR :: "../cmuratori_computer_enhance/perfaware/part1/";
 
 bytes: []u8
@@ -67,56 +67,45 @@ simulate :: proc() {
 
             reg := MOV_REG_TABLE[reg_field] if w == 0 else MOV_REG_TABLE_W[reg_field]
 
+            rm: string
+
             switch mod_field {
                 case 0b00: // Effective Address
                     sb := strings.builder_make(context.temp_allocator)
-                    // defer strings.builder_destroy(&sb)
                     
-                    rm: string
                     if (rm_field == 0b110) { // Direct Addressing
-                        data := extract_data(true)
-                        rm = fmt.sbprintf(&sb, "[%v]", data)
+                        disp := extract_data(true)
+                        rm = fmt.sbprintf(&sb, "[%v]", disp)
                     } else {
                         rm = fmt.sbprintf(&sb, "[%v]", MOV_EFFECTIVE_ADDRESS_TABLE[rm_field])
                     }
 
-                    if d == 0 {
-                        fmt.printf("%v, %v\n", rm, reg)
-                    } else {
-                        fmt.printf("%v, %v\n", reg, rm)
-                    }
-
                 case 0b01: // Effective Address + D8
-                    data := extract_data(false)
+                    disp := extract_data(false)
 
                     sb := strings.builder_make(context.temp_allocator)
 
-                    rm := fmt.sbprintf(&sb, "[%v + %v]", MOV_EFFECTIVE_ADDRESS_TABLE[rm_field], data)
+                    rm = fmt.sbprintf(&sb, "[%v + %v]", MOV_EFFECTIVE_ADDRESS_TABLE[rm_field], disp)
 
-                    if d == 0 {
-                        fmt.printf("%v, %v\n", rm, reg)
-                    } else {
-                        fmt.printf("%v, %v\n", reg, rm)
-                    }
 
                 case 0b10: // Effective Address + D16
-                    data := extract_data(true)
+                    disp := extract_data(true)
 
                     sb := strings.builder_make(context.temp_allocator)
-                    rm := fmt.sbprintf(&sb, "[%v + %v]", MOV_EFFECTIVE_ADDRESS_TABLE[rm_field], data)
-
-                    if d == 0 {
-                        fmt.printf("%v, %v\n", rm, reg)
-                    } else {
-                        fmt.printf("%v, %v\n", reg, rm)
-                    }
+                    rm = fmt.sbprintf(&sb, "[%v + %v]", MOV_EFFECTIVE_ADDRESS_TABLE[rm_field], disp)
 
                 case 0b11: // Register to Register
                     rm := MOV_REG_TABLE[rm_field] if w == 0 else MOV_REG_TABLE_W[rm_field]
                     fmt.printf("%v, %v\n", rm, reg)
+                    continue; // continue early to skip the final print.
             }
 
-
+            if d == 0 {
+                fmt.printf("%v, %v\n", rm, reg)
+            } else {
+                fmt.printf("%v, %v\n", reg, rm)
+            }
+            
         case is_instruction(b, .Mov_Immediate_To_Register_Or_Memory):
             fmt.print("mov ")
 
@@ -125,31 +114,64 @@ simulate :: proc() {
             b = advance()
             mod_field := bits.bitfield_extract(b, 6, 2)
             rm_field := bits.bitfield_extract(b, 0, 3)
-            
-            data: u16
+
             rm: string
-            if w == 0 {
-                rm = MOV_REG_TABLE[rm_field]
-            } else {
-                rm = MOV_REG_TABLE_W[rm_field]
+
+            switch mod_field {
+                case 0b00: // Effective Address
+                    sb := strings.builder_make(context.temp_allocator)
+                    
+                    if (rm_field == 0b110) { // Direct Addressing
+                        disp := extract_data(true)
+                        rm = fmt.sbprintf(&sb, "[%v]", disp)
+                    } else {
+                        rm = fmt.sbprintf(&sb, "[%v]", MOV_EFFECTIVE_ADDRESS_TABLE[rm_field])
+                    }
+
+                case 0b01: // Effective Address + D8
+                    disp := extract_data(false)
+
+                    sb := strings.builder_make(context.temp_allocator)
+                    rm = fmt.sbprintf(&sb, "[%v + %v]", MOV_EFFECTIVE_ADDRESS_TABLE[rm_field], disp)
+
+
+                case 0b10: // Effective Address + D16
+                    disp := extract_data(true)
+
+                    sb := strings.builder_make(context.temp_allocator)
+                    rm = fmt.sbprintf(&sb, "[%v + %v]", MOV_EFFECTIVE_ADDRESS_TABLE[rm_field], disp)
             }
+            
+            data := extract_data(w == 1)
+            buf : [8]u8
+            data_string := strconv.itoa(buf[:], int(data))
+            if (w == 0) {
+                data_string = strings.concatenate({"byte ", data_string}, context.temp_allocator)
+            } else {
+                data_string = strings.concatenate({"word ", data_string}, context.temp_allocator)
+            }
+
+            fmt.printf("%v, %v\n", rm, data_string)
 
         case is_instruction(b, .Mov_Immediate_To_Register):
             fmt.print("mov ")
 
             w := bit_extract(b, 3)
+
             reg_field := bits.bitfield_extract(b, 0, 3)
             reg: string
-            data: u16
             if w == 0 {
                 reg = MOV_REG_TABLE[reg_field]
-                data = extract_data(false)
             } else { // wide
                 reg = MOV_REG_TABLE_W[reg_field]
-                data = extract_data(true)
             }
 
+            data := extract_data(w == 1)
+
             fmt.printf("%v, %v\n", reg, data)
+        
+        case is_instruction(b, .Mov_Memory_To_Accumulator):
+            fmt.println("Memory to Accumulator")
 
         case:
             fmt.println("Unknown instruction")
@@ -160,9 +182,9 @@ simulate :: proc() {
 
 bit_extract :: proc(value: u8, offset: uint) -> u8 { return bits.bitfield_extract_u8(value, offset, 1) }
 
-advance :: proc() -> (b: byte) {
+advance :: proc(distance : uint = 1) -> (b: byte) {
     b = bytes[i]
-    i += 1
+    i += distance
     return
 }
 
