@@ -8,9 +8,10 @@ import "core:os"
 import "core:strconv"
 import "core:strings"
 
-import "instructions"
+import instr "instructions" 
 
-TEST_FILE :: "listing_0040_challenge_movs"
+TEST_FILE :: "listing_0041_add_sub_cmp_jnz"
+// TEST_FILE :: "listing_0040_challenge_movs"
 TEST_DIR :: "../cmuratori_computer_enhance/perfaware/part1/";
 
 bytes: []u8
@@ -46,56 +47,34 @@ main :: proc() {
 simulate :: proc() {
     fmt.println("bits 16\n")
 
-    using instructions
+    using instr
 
     for i < len(bytes) {
 
         b := advance()
         switch {
         /** MOV **/
-        case is_instruction(b, .Mov_Register_Or_Memory_To_Or_From_Register): 
+        case is_instruction(b, .Mov_Register_Or_Memory_To_Or_From_Register):
             fmt.print("mov ")
+            reg_mem_to_from_register(b)
 
-            d := bit_extract(b, 1)
-            w := bit_extract(b, 0)
+        case is_instruction(b, .Add_Register_Or_Memory_With_Register_To_Either):
+            fmt.print("add ")
+            reg_mem_to_from_register(b)
 
-            b = advance()
-            // mod reg r/m
-            mod_field := bits.bitfield_extract(b, 6, 2)
-            reg_field := bits.bitfield_extract(b, 3, 3)
-            rm_field := bits.bitfield_extract(b, 0, 3)
-
-            reg := MOV_REG_TABLE[reg_field] if w == 0 else MOV_REG_TABLE_W[reg_field]
-
-            rm := parse_mod(mod_field, rm_field)
-
-            if d == 0 {
-                fmt.printf("%v, %v\n", rm, reg)
-            } else {
-                fmt.printf("%v, %v\n", reg, rm)
-            }
+        case is_instruction(b, .Sub_Register_Or_Memory_With_Register_To_Either):
+            fmt.print("sub ")
+            reg_mem_to_from_register(b)
             
         case is_instruction(b, .Mov_Immediate_To_Register_Or_Memory):
             fmt.print("mov ")
-
-            w := bit_extract(b, 0)
-
-            b = advance()
-            mod_field := bits.bitfield_extract(b, 6, 2)
-            rm_field := bits.bitfield_extract(b, 0, 3)
-
-            rm := parse_mod(mod_field, rm_field)
-
-            data := extract_data(w == 1)
-            buf : [8]u8
-            data_string := strconv.itoa(buf[:], int(data))
-            if (w == 0) {
-                data_string = strings.concatenate({"byte ", data_string}, context.temp_allocator)
-            } else {
-                data_string = strings.concatenate({"word ", data_string}, context.temp_allocator)
-            }
-
-            fmt.printf("%v, %v\n", rm, data_string)
+            imm_to_reg_mem(b, false)
+        
+        case is_instruction(b, .Immediate_To_Register_Or_Memory):
+            // Check arithmetic type in following byte
+            arithmetic_type_field := bits.bitfield_extract(peek(), 3, 3)
+            fmt.printf("%v ", IMMEDIATE_TO_REGISTER_MEMORY_TABLE[arithmetic_type_field])
+            imm_to_reg_mem(b)
 
         case is_instruction(b, .Mov_Immediate_To_Register):
             fmt.print("mov ")
@@ -115,13 +94,16 @@ simulate :: proc() {
             fmt.printf("%v, %v\n", reg, data)
         
         case is_instruction(b, .Mov_Memory_To_Accumulator), is_instruction(b, .Mov_Accumulator_To_Memory):
-            w := bit_extract(b, 0)
-            address := extract_data(w == 1)
-            if (is_instruction(b, .Mov_Memory_To_Accumulator)) {
-                fmt.printf("ax, [%v]\n", address)
-            } else {
-                fmt.printf("[%v], ax\n", address)
-            }
+            fmt.print("mov ")
+            mem_to_acc(b)
+
+        case is_instruction(b, .Add_Immediate_To_Accumulator):
+            fmt.print("add ")
+            imm_to_acc(b)
+
+        case is_instruction(b, .Sub_Immediate_To_Accumulator):
+            fmt.print("sub ")
+            imm_to_acc(b)
 
         case:
             fmt.println("Unknown instruction")
@@ -132,10 +114,14 @@ simulate :: proc() {
 
 bit_extract :: proc(value: u8, offset: uint) -> u8 { return bits.bitfield_extract_u8(value, offset, 1) }
 
-advance :: proc(distance : uint = 1) -> (b: byte) {
+advance :: proc(distance: uint = 1) -> (b: byte) {
     b = bytes[i]
     i += distance
     return
+}
+
+peek :: proc(distance: uint = 1) -> byte {
+    return bytes[i + 1]
 }
 
 extract_data :: proc(wide: bool) -> (data: u16) {
@@ -151,8 +137,71 @@ extract_data :: proc(wide: bool) -> (data: u16) {
     return
 }
 
-parse_mod :: proc(mod_field, rm_field: u8) -> string {
-    using instructions
+reg_mem_to_from_register :: proc(b: byte) {
+    d := bit_extract(b, 1)
+    w := bit_extract(b, 0)
+
+    b := advance()
+    // mod reg r/m
+    mod_field := bits.bitfield_extract(b, 6, 2)
+    reg_field := bits.bitfield_extract(b, 3, 3)
+    rm_field := bits.bitfield_extract(b, 0, 3)
+
+    reg := instr.MOV_REG_TABLE[reg_field] if w == 0 else instr.MOV_REG_TABLE_W[reg_field]
+
+    rm := parse_mod(mod_field, rm_field, w)
+
+    if d == 0 {
+        fmt.printf("%v, %v\n", rm, reg)
+    } else {
+        fmt.printf("%v, %v\n", reg, rm)
+    }
+}
+
+imm_to_reg_mem :: proc(b: byte, check_signed := true) {
+    s := bit_extract(b, 1)
+    w := bit_extract(b, 0)
+
+    b := advance()
+    mod_field := bits.bitfield_extract(b, 6, 2)
+    rm_field := bits.bitfield_extract(b, 0, 3)
+
+    rm := parse_mod(mod_field, rm_field, w)
+
+    data := extract_data(w == 1 && s == 0)
+    buf : [8]u8
+    data_string := strconv.itoa(buf[:], int(data))
+    if (mod_field != 0b11) {
+        if (w == 0) {
+            data_string = strings.concatenate({"byte ", data_string}, context.temp_allocator)
+        } else {
+            data_string = strings.concatenate({"word ", data_string}, context.temp_allocator)
+        }
+    }
+
+    fmt.printf("%v, %v\n", rm, data_string)
+}
+
+mem_to_acc :: proc(b: byte) {
+    w := bit_extract(b, 0)
+    acc := "ax" if w == 1 else "al"
+    address := extract_data(w == 1)
+    if (instr.is_instruction(b, .Mov_Accumulator_To_Memory)) {
+        fmt.printf("[%v], %v\n", address, acc)
+    } else {
+        fmt.printf("%v, [%v]\n", acc, address)
+    }
+}
+
+imm_to_acc :: proc(b: byte) {
+    w := bit_extract(b, 0)
+    acc := "ax" if w == 1 else "al"
+    data := extract_data(w == 1)
+    fmt.printf("%v, %v\n", acc, data)
+}
+
+parse_mod :: proc(mod_field, rm_field, w: u8) -> string {
+    using instr
     rm: string
     switch mod_field {
         case 0b00: // Effective Address
@@ -177,6 +226,9 @@ parse_mod :: proc(mod_field, rm_field: u8) -> string {
 
             sb := strings.builder_make(context.temp_allocator)
             rm = fmt.sbprintf(&sb, "[%v + %v]", MOV_EFFECTIVE_ADDRESS_TABLE[rm_field], disp)
+
+        case 0b11: // R/M as register
+            rm = instr.MOV_REG_TABLE[rm_field] if w == 0 else instr.MOV_REG_TABLE_W[rm_field]
     }
     return rm
 }
